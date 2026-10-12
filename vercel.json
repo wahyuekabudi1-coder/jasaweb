@@ -1,31 +1,23 @@
-
 {
   "version": 2,
-  "name": "nexstack-studio",
-  "routes": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/backend/api/$1.js"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "src": "/js/(.*)",
-      "dest": "/frontend/js/$1"
+      "source": "/layanan",
+      "destination": "/layanan.html"
     },
     {
-      "src": "/layanan",
-      "dest": "/frontend/layanan.html"
+      "source": "/portofolio",
+      "destination": "/portofolio.html"
     },
     {
-      "src": "/portofolio",
-      "dest": "/frontend/portofolio.html"
-    },
-    {
-      "src": "/konsultasi",
-      "dest": "/frontend/konsultasi.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "source": "/konsultasi",
+      "destination": "/konsultasi.html"
     }
   ]
 }

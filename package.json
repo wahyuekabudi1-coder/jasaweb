@@ -1,34 +1,21 @@
 {
   "name": "nexstack-studio",
   "version": "1.0.0",
-  "description": "Full-Stack Web & App Development Agency with Supabase PostgreSQL, QRIS Payment, and Serverless API",
-  "main": "backend/api/submit-consultation.js",
+  "private": true,
+  "type": "module",
+  "description": "NexStack Studio website with Vercel serverless API and Supabase",
   "scripts": {
     "dev": "vercel dev",
-    "start": "node backend/server.js",
-    "build": "echo 'Frontend static assets ready. No build step required.'",
-    "test": "node tests/audit-verify.js"
+    "build": "node -e \"console.log('NexStack Studio static site ready')\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.4",
-    "crypto": "^1.0.1",
-    "dotenv": "^16.4.5",
     "resend": "^3.2.0"
   },
   "devDependencies": {
     "vercel": "^34.2.0"
   },
   "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "nexstack",
-    "web-agency",
-    "fullstack",
-    "supabase",
-    "qris",
-    "postgresql"
-  ],
-  "author": "NexStack Studio Engineering",
-  "license": "MIT"
+    "node": ">=18"
+  }
 }
