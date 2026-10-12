@@ -1,0 +1,107 @@
+-- =========================================================================
+-- NexStack Studio - Seed Data (Contoh Data Awal untuk Uji Coba)
+-- File: database/seed.sql
+-- =========================================================================
+
+-- 1. Insert Contoh Data Leads Konsultasi
+INSERT INTO consultations (
+  id,
+  client_name, 
+  client_email, 
+  client_whatsapp, 
+  company_name, 
+  project_type, 
+  target_timeline, 
+  budget_estimate, 
+  down_payment_estimate, 
+  project_features,
+  requirements_note,
+  status
+) VALUES 
+(
+  'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+  'Budi Pratama', 
+  'budi@pratamagroup.co.id', 
+  '+6281234567890', 
+  'PT Pratama Logistik Nusantara', 
+  'custom_web_app', 
+  '6 - 8 Minggu', 
+  29600000, 
+  14800000, 
+  '["Autentikasi & Multi-Role User", "Integrasi Payment Gateway QRIS", "Dashboard Analytics Real-Time"]'::jsonb,
+  'Kebutuhan sistem pelacakan pengiriman kontainer terintegrasi dengan REST API kargo dan notifikasi WhatsApp otomatis.',
+  'contacted'
+),
+(
+  'b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e',
+  'Sarah Anindita', 
+  'sarah@luminafashion.id', 
+  '+6281987654321', 
+  'Lumina Fashion Retail', 
+  'ecommerce', 
+  '4 - 6 Minggu', 
+  18500000, 
+  9250000, 
+  '["Katalog Produk Interaktif", "Checkout QRIS & Virtual Account", "Integrasi Ekspedisi JNE/J&T"]'::jsonb,
+  'Toko online direct-to-consumer dengan sistem sinkronisasi stok gudang.',
+  'new'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- 2. Insert Contoh Data Proposal Estimasi
+INSERT INTO estimate_proposals (
+  id,
+  proposal_number,
+  consultation_id,
+  total_amount,
+  dp_amount,
+  remaining_amount,
+  selected_tech_stack,
+  warranty_period_months,
+  valid_until
+) VALUES 
+(
+  'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f',
+  'NX-2025-EST-942',
+  'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+  29600000,
+  14800000,
+  14800000,
+  '["PostgreSQL", "Node.js API", "Tailwind CSS", "Supabase BaaS"]'::jsonb,
+  3,
+  CURRENT_DATE + INTERVAL '14 days'
+)
+ON CONFLICT (proposal_number) DO NOTHING;
+
+-- 3. Insert Contoh Data Transaksi QRIS Selesai (Settled)
+INSERT INTO transactions (
+  id,
+  trx_reference,
+  estimate_proposal_id,
+  consultation_id,
+  amount,
+  payment_method,
+  payment_status,
+  gateway_provider,
+  gateway_transaction_id,
+  paid_at,
+  receipt_email,
+  email_sent_at,
+  metadata
+) VALUES 
+(
+  'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a',
+  'TRX-NX2025-QRIS-9428',
+  'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f',
+  'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+  14800000,
+  'QRIS',
+  'settled',
+  'midtrans',
+  'midtrans_order_9428_mock',
+  NOW() - INTERVAL '2 hours',
+  'budi@pratamagroup.co.id',
+  NOW() - INTERVAL '2 hours',
+  '{"note": "Pembayaran DP 50% resmi terverifikasi via QRIS Dinamis"}'::jsonb
+)
+ON CONFLICT (trx_reference) DO NOTHING;

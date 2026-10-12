@@ -1,0 +1,167 @@
+-- =========================================================================
+-- NexStack Studio - Production Database Schema
+-- File: database/schema.sql
+-- Engine: PostgreSQL 14+ / Supabase Compatible
+-- =========================================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. ENUMS
+DO $$ BEGIN
+  CREATE TYPE project_type_enum AS ENUM (
+    'landing_page', 
+    'company_profile', 
+    'custom_web_app', 
+    'saas_mvp', 
+    'ecommerce', 
+    'enterprise_portal'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE consultation_status_enum AS ENUM (
+    'new', 
+    'contacted', 
+    'proposal_sent', 
+    'deal_won', 
+    'deal_lost', 
+    'cancelled'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE payment_method_enum AS ENUM (
+    'QRIS', 
+    'BCA_TRANSFER', 
+    'MANDIRI_TRANSFER', 
+    'CREDIT_CARD', 
+    'VIRTUAL_ACCOUNT'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE payment_status_enum AS ENUM (
+    'pending', 
+    'processing', 
+    'settled', 
+    'expired', 
+    'failed', 
+    'refunded'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- 2. TABEL: CONSULTATIONS / LEADS FORM
+CREATE TABLE IF NOT EXISTS consultations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  client_email VARCHAR(255) NOT NULL,
+  client_whatsapp VARCHAR(50) NOT NULL,
+  company_name VARCHAR(255),
+  project_type project_type_enum NOT NULL DEFAULT 'custom_web_app',
+  target_timeline VARCHAR(100),
+  budget_estimate NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  down_payment_estimate NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  project_features JSONB DEFAULT '[]'::jsonb,
+  requirements_note TEXT,
+  status consultation_status_enum DEFAULT 'new' NOT NULL,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  CONSTRAINT valid_email CHECK (client_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+);
+
+CREATE INDEX IF NOT EXISTS idx_consultations_email ON consultations(client_email);
+CREATE INDEX IF NOT EXISTS idx_consultations_status ON consultations(status);
+CREATE INDEX IF NOT EXISTS idx_consultations_created_at ON consultations(created_at DESC);
+
+-- 3. TABEL: ESTIMATE_PROPOSALS
+CREATE TABLE IF NOT EXISTS estimate_proposals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  proposal_number VARCHAR(100) UNIQUE NOT NULL,
+  consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+  total_amount NUMERIC(15, 2) NOT NULL,
+  dp_amount NUMERIC(15, 2) NOT NULL,
+  remaining_amount NUMERIC(15, 2) NOT NULL,
+  selected_tech_stack JSONB DEFAULT '[]'::jsonb,
+  warranty_period_months INT DEFAULT 3,
+  valid_until DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '14 days'),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_estimate_proposals_number ON estimate_proposals(proposal_number);
+
+-- 4. TABEL: TRANSACTIONS & PAYMENTS (QRIS / Gateway Webhook)
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trx_reference VARCHAR(100) UNIQUE NOT NULL,
+  estimate_proposal_id UUID REFERENCES estimate_proposals(id) ON DELETE SET NULL,
+  consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+  amount NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+  payment_method payment_method_enum NOT NULL DEFAULT 'QRIS',
+  payment_status payment_status_enum NOT NULL DEFAULT 'pending',
+  gateway_provider VARCHAR(50) DEFAULT 'midtrans',
+  gateway_transaction_id VARCHAR(255),
+  qris_payload_url TEXT,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  receipt_email VARCHAR(255),
+  email_sent_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions(trx_reference);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(payment_status);
+
+-- 5. TABEL: AUDIT_LOGS
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  event_name VARCHAR(100) NOT NULL,
+  payload JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 6. ROW LEVEL SECURITY (RLS) POLICIES
+ALTER TABLE consultations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE estimate_proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Pengunjung dapat mengirimkan form konsultasi (Hanya INSERT)
+CREATE POLICY "Public anonymous insert consultations" 
+  ON consultations FOR INSERT 
+  TO anon, authenticated 
+  WITH CHECK (true);
+
+-- Pengunjung dapat membaca data proposal miliknya via proposal_number
+CREATE POLICY "Public read estimate proposals" 
+  ON estimate_proposals FOR SELECT 
+  TO anon, authenticated 
+  USING (true);
+
+-- Pengunjung dapat memeriksa status transaksi miliknya via trx_reference
+CREATE POLICY "Public read transaction status" 
+  ON transactions FOR SELECT 
+  TO anon, authenticated 
+  USING (true);
+
+-- Transaksi hanya dapat di-insert melalui backend API / Service Role yang aman
+CREATE POLICY "Service role full access transactions" 
+  ON transactions FOR ALL 
+  TO service_role 
+  USING (true) 
+  WITH CHECK (true);
+
+CREATE POLICY "Service role full access audit logs" 
+  ON audit_logs FOR ALL 
+  TO service_role 
+  USING (true) 
+  WITH CHECK (true);

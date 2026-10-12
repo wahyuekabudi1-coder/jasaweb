@@ -1,0 +1,149 @@
+-- =========================================================================
+-- NexStack Studio - Production Database Schema & Migration Script
+-- Engine: PostgreSQL 14+ / Supabase Compatible
+-- Generated for: NexStack Studio Full-Stack Platform
+-- =========================================================================
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. ENUM TYPES
+CREATE TYPE project_type_enum AS ENUM (
+  'landing_page', 
+  'company_profile', 
+  'custom_web_app', 
+  'saas_mvp', 
+  'ecommerce', 
+  'enterprise_portal'
+);
+
+CREATE TYPE consultation_status_enum AS ENUM (
+  'new', 
+  'contacted', 
+  'proposal_sent', 
+  'deal_won', 
+  'deal_lost', 
+  'cancelled'
+);
+
+CREATE TYPE payment_method_enum AS ENUM (
+  'QRIS', 
+  'BCA_TRANSFER', 
+  'MANDIRI_TRANSFER', 
+  'CREDIT_CARD', 
+  'VIRTUAL_ACCOUNT'
+);
+
+CREATE TYPE payment_status_enum AS ENUM (
+  'pending', 
+  'processing', 
+  'settled', 
+  'expired', 
+  'failed', 
+  'refunded'
+);
+
+-- 2. TABLE: CONSULTATIONS / LEADS
+CREATE TABLE IF NOT EXISTS consultations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  client_name VARCHAR(255) NOT NULL,
+  client_email VARCHAR(255) NOT NULL,
+  client_whatsapp VARCHAR(50),
+  company_name VARCHAR(255),
+  project_type project_type_enum NOT NULL DEFAULT 'custom_web_app',
+  target_timeline VARCHAR(100),
+  budget_estimate NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  down_payment_estimate NUMERIC(15, 2) NOT NULL DEFAULT 0,
+  project_features JSONB DEFAULT '[]'::jsonb,
+  requirements_note TEXT,
+  status consultation_status_enum DEFAULT 'new' NOT NULL,
+  ip_address VARCHAR(45),
+  user_agent TEXT
+);
+
+CREATE INDEX idx_consultations_email ON consultations(client_email);
+CREATE INDEX idx_consultations_status ON consultations(status);
+CREATE INDEX idx_consultations_created_at ON consultations(created_at DESC);
+
+-- 3. TABLE: ESTIMATE_PROPOSALS
+CREATE TABLE IF NOT EXISTS estimate_proposals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  proposal_number VARCHAR(100) UNIQUE NOT NULL, -- e.g. NX-2025-EST-942
+  consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+  total_amount NUMERIC(15, 2) NOT NULL,
+  dp_amount NUMERIC(15, 2) NOT NULL,
+  remaining_amount NUMERIC(15, 2) NOT NULL,
+  selected_tech_stack JSONB DEFAULT '[]'::jsonb,
+  warranty_period_months INT DEFAULT 3,
+  valid_until DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '14 days'),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- 4. TABLE: TRANSACTIONS & PAYMENTS (QRIS / Bank Transfer)
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trx_reference VARCHAR(100) UNIQUE NOT NULL, -- e.g. TRX-NX2025-QRIS-9428
+  estimate_proposal_id UUID REFERENCES estimate_proposals(id) ON DELETE SET NULL,
+  consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+  amount NUMERIC(15, 2) NOT NULL,
+  payment_method payment_method_enum NOT NULL DEFAULT 'QRIS',
+  payment_status payment_status_enum NOT NULL DEFAULT 'pending',
+  gateway_provider VARCHAR(50) DEFAULT 'midtrans', -- midtrans, xendit, manual
+  gateway_transaction_id VARCHAR(255),
+  qris_payload_url TEXT,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  receipt_email VARCHAR(255),
+  email_sent_at TIMESTAMP WITH TIME ZONE,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX idx_transactions_trx_reference ON transactions(trx_reference);
+CREATE INDEX idx_transactions_status ON transactions(payment_status);
+
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES FOR SUPABASE
+ALTER TABLE consultations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE estimate_proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+-- Allow anonymous visitors to submit consultation inquiries and start transactions
+CREATE POLICY "Allow public insert consultations" 
+  ON consultations FOR INSERT 
+  TO anon, authenticated 
+  WITH CHECK (true);
+
+CREATE POLICY "Allow public insert transactions" 
+  ON transactions FOR INSERT 
+  TO anon, authenticated 
+  WITH CHECK (true);
+
+-- Allow reading transaction by exact reference number (for checking QRIS status)
+CREATE POLICY "Allow public read transaction by reference" 
+  ON transactions FOR SELECT 
+  TO anon, authenticated 
+  USING (true);
+
+-- 6. SAMPLE SEED DATA
+INSERT INTO consultations (
+  client_name, 
+  client_email, 
+  client_whatsapp, 
+  company_name, 
+  project_type, 
+  target_timeline, 
+  budget_estimate, 
+  down_payment_estimate, 
+  requirements_note
+) VALUES (
+  'Budi Pratama', 
+  'budi@pratamagroup.co.id', 
+  '+6281234567890', 
+  'Pratama Logistik Nusantara', 
+  'custom_web_app', 
+  '6 - 8 Minggu', 
+  29600000, 
+  14800000, 
+  'Pembuatan sistem pelacakan pengiriman kargo terintegrasi dengan REST API & Notifikasi WhatsApp.'
+);

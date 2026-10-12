@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "name": "nexstack-studio",
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/api/$1.js"
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/frontend/js/$1"
+    },
+    {
+      "src": "/layanan",
+      "dest": "/frontend/layanan.html"
+    },
+    {
+      "src": "/portofolio",
+      "dest": "/frontend/portofolio.html"
+    },
+    {
+      "src": "/konsultasi",
+      "dest": "/frontend/konsultasi.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase-url",
+    "SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
+    "RESEND_API_KEY": "@resend-api-key",
+    "MIDTRANS_SERVER_KEY": "@midtrans-server-key"
+  }
+}
